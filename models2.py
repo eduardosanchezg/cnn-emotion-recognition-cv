@@ -191,7 +191,7 @@ net.compile(
 batch_size = 32 #batch size of 32 performs the best.
 epochs = 100
 
-history = net.fit(x=X_train,y=y_train, validation_data=(X_valid,y_valid), steps_per_epoch=len(X_train)/ batch_size,epochs=epochs,use_multiprocessing=True)
+history = net.fit(x=X_train,y=y_train, validation_data=(X_valid,y_valid),epochs=epochs,use_multiprocessing=True) #steps_per_epoch=len(X_train)/ batch_size
 
 model_yaml = net.to_yaml()
 with open("model.yaml", "w") as yaml_file:
