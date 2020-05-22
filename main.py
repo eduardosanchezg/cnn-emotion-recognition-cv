@@ -1,92 +1,57 @@
 import math
 import numpy as np
 import pandas as pd
-#from __future__ import absolute_import, division, print_function, unicode_literals
-
 import scikitplot
-import seaborn as sns
+from keras.callbacks import EarlyStopping
 from matplotlib import pyplot
-
-
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import classification_report
-
-import tensorflow as tf
 from keras import Sequential
-from keras.datasets import mnist
-from keras.layers import Dropout, BatchNormalization, LeakyReLU, Activation, Dense, Flatten, MaxPooling2D, Conv2D
-from keras.preprocessing.image import ImageDataGenerator
-from keras.optimizers import adam, Adam
-
+from keras.layers import Dropout, BatchNormalization, Dense, Flatten, MaxPooling2D, Conv2D
+from keras.optimizers import Adam
 from keras.utils import np_utils
 
-optim = Adam(0.001)
+##parameters
+batch_size = 32
+epochs = 100
+learning_rate = 0.001
+optim = Adam(learning_rate)
+loss = 'categorical_crossentropy'
+filename = '/home/eduardo/master/cv/corpora/facial-expression-recognitionferchallenge/fer2013/fer2013/fer2013.csv'
 
-df = pd.read_csv('/home/eduardo/master/cv/corpora/facial-expression-recognitionferchallenge/fer2013/fer2013/fer2013.csv')
-
-#print(df.shape)
-#print(df.head())
-
-#print(df.emotion.unique())
-
-emotion_label_to_text = {0:'anger', 1:'disgust', 2:'fear', 3:'happiness', 4: 'sadness', 5: 'surprise', 6: 'neutral'}
-
-#print(df.Usage.value_counts())
-
+##data importing
+df = pd.read_csv(filename)
 side = math.sqrt(len(df.pixels[0].split(' ')))
-#
-# fig = pyplot.figure(1, (14, 14))
-#
-# k = 0
-# for label in sorted(df.emotion.unique()):
-#     for j in range(7):
-#         px = df[df.emotion==label].pixels.iloc[k]
-#         px = np.array(px.split(' ')).reshape(48, 48).astype('float32')
-#
-#         k += 1
-#         ax = pyplot.subplot(7, 7, k)
-#         ax.imshow(px, cmap='gray')
-#         ax.set_xticks([])
-#         ax.set_yticks([])
-#         ax.set_title(emotion_label_to_text[label])
-#         pyplot.tight_layout()
-#
-# pyplot.show()
-
 img_array = df.pixels.apply(lambda x: np.array(x.split(' ')).reshape(48, 48, 1).astype('float32'))
 img_array = np.stack(img_array, axis=0)
 
+##data preprocessing
 le = LabelEncoder()
 img_labels = le.fit_transform(df.emotion)
 img_labels = np_utils.to_categorical(img_labels)
-
-
 le_name_mapping = dict(zip(le.classes_, le.transform(le.classes_)))
-#print(le_name_mapping)
 
 X_train, X_valid, y_train, y_valid = train_test_split(img_array, img_labels,
                                                     shuffle=True, stratify=img_labels,
-                                                    test_size=0.1, random_state=42)
+                                                    test_size=0.1, random_state=12)
 
-print(X_train.shape, X_valid.shape, y_train.shape, y_valid.shape)
+
 
 img_width = X_train.shape[1]
 img_height = X_train.shape[2]
 img_depth = X_train.shape[3]
 num_classes = y_train.shape[1]
 
-X_train = X_train / 255
-X_valid = X_valid / 255
-
-net = Sequential(name='DCNN')
+## nn building
+net = Sequential(name='CNN')
 
 net.add(
     Conv2D(
         filters=64,
         kernel_size=(5, 5),
         input_shape=(img_width, img_height, img_depth),
-        activation='elu',
+        activation='relu',
         padding='same',
         kernel_initializer='he_normal',
         name='conv2d_1'
@@ -97,7 +62,7 @@ net.add(
     Conv2D(
         filters=64,
         kernel_size=(5, 5),
-        activation='elu',
+        activation='relu',
         padding='same',
         kernel_initializer='he_normal',
         name='conv2d_2'
@@ -112,7 +77,7 @@ net.add(
     Conv2D(
         filters=128,
         kernel_size=(3, 3),
-        activation='elu',
+        activation='relu',
         padding='same',
         kernel_initializer='he_normal',
         name='conv2d_3'
@@ -123,7 +88,7 @@ net.add(
     Conv2D(
         filters=128,
         kernel_size=(3, 3),
-        activation='elu',
+        activation='relu',
         padding='same',
         kernel_initializer='he_normal',
         name='conv2d_4'
@@ -138,7 +103,7 @@ net.add(
     Conv2D(
         filters=256,
         kernel_size=(3, 3),
-        activation='elu',
+        activation='relu',
         padding='same',
         kernel_initializer='he_normal',
         name='conv2d_5'
@@ -149,7 +114,7 @@ net.add(
     Conv2D(
         filters=256,
         kernel_size=(3, 3),
-        activation='elu',
+        activation='relu',
         padding='same',
         kernel_initializer='he_normal',
         name='conv2d_6'
@@ -165,7 +130,7 @@ net.add(Flatten(name='flatten'))
 net.add(
     Dense(
         128,
-        activation='elu',
+        activation='relu',
         kernel_initializer='he_normal',
         name='dense_1'
     )
@@ -183,15 +148,22 @@ net.add(
 )
 
 net.compile(
-    loss='categorical_crossentropy',
+    loss=loss,
     optimizer=optim,
     metrics=['accuracy']
 )
 
-batch_size = 32 #batch size of 32 performs the best.
-epochs = 100
 
-history = net.fit(x=X_train,y=y_train, validation_data=(X_valid,y_valid),epochs=epochs,use_multiprocessing=True) #steps_per_epoch=len(X_train)/ batch_size
+
+net.summary()
+
+#callbacks (not inlcuded in report due to constraints)
+es_loss = EarlyStopping()
+es_acc = EarlyStopping(monitor='acc')
+callbacks = [es_loss]
+
+## nn training
+history = net.fit(x=X_train,y=y_train, validation_data=(X_valid,y_valid),epochs=epochs,use_multiprocessing=True, callbacks=callbacks) #steps_per_epoch=len(X_train)/ batch_size
 
 model_yaml = net.to_yaml()
 with open("model.yaml", "w") as yaml_file:
@@ -199,9 +171,10 @@ with open("model.yaml", "w") as yaml_file:
 
 net.save("model.h5")
 
+# accuracy visualization
 yhat_valid = net.predict_classes(X_valid)
 scikitplot.metrics.plot_confusion_matrix(np.argmax(y_valid, axis=1), yhat_valid, figsize=(7,7))
-pyplot.savefig("confusion_matrix_dcnn.png")
+pyplot.savefig("confusion_matrix.png")
 
 print(f'total wrong validation predictions: {np.sum(np.argmax(y_valid, axis=1) != yhat_valid)}\n\n')
 print(classification_report(np.argmax(y_valid, axis=1), yhat_valid))
